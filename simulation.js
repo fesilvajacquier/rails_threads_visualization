@@ -228,6 +228,10 @@ function renderVisualization(timelines) {
  */
 function generateThreadConfigs(threadCount) {
     const container = document.getElementById('thread-configs');
+    if (!container) {
+        console.error('generateThreadConfigs: thread-configs element not found');
+        return;
+    }
     container.innerHTML = '';
 
     for (let i = 0; i < threadCount; i++) {
@@ -282,6 +286,11 @@ function updateVisualization() {
 document.addEventListener('DOMContentLoaded', () => {
     const threadCountInput = document.getElementById('thread-count');
     const regenerateButton = document.getElementById('regenerate');
+
+    if (!threadCountInput || !regenerateButton) {
+        console.error('DOMContentLoaded: Required elements (thread-count or regenerate) not found');
+        return;
+    }
 
     // Initialize with default thread count
     const initialThreadCount = parseInt(threadCountInput.value) || 3;
