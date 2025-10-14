@@ -36,6 +36,21 @@ const STATE = {
  * @returns {Array<Array<{state: string, startTime: number, duration: number}>>} Timeline for each thread
  */
 function simulateThreads(threadConfigs) {
+    // Input validation
+    if (!Array.isArray(threadConfigs)) {
+        throw new TypeError('threadConfigs must be an array');
+    }
+
+    if (threadConfigs.length === 0) {
+        return [];
+    }
+
+    // Validate all profile keys exist
+    const invalidProfiles = threadConfigs.filter(key => !REQUEST_PROFILES[key]);
+    if (invalidProfiles.length > 0) {
+        throw new Error(`Invalid profile key(s): ${invalidProfiles.join(', ')}. Valid profiles are: ${Object.keys(REQUEST_PROFILES).join(', ')}`);
+    }
+
     const threads = threadConfigs.map(profileKey => ({
         profile: REQUEST_PROFILES[profileKey],
         currentPhaseIndex: 0,
