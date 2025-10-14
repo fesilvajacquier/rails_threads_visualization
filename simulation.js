@@ -54,41 +54,15 @@ function simulateThreads(threadConfigs) {
     const threads = threadConfigs.map(profileKey => ({
         profile: REQUEST_PROFILES[profileKey],
         currentPhaseIndex: 0,
-        phaseStartTime: 0,
+        phaseExecutedTime: 0,  // Time actually spent executing current phase
         finished: false
     }));
 
     const timelines = threadConfigs.map(() => []);
-    let currentTime = 0;
     let gvlHolder = null; // Index of thread currently holding GVL, or null
 
-    // Calculate total duration needed for simulation
-    const maxDuration = Math.max(...threads.map(t =>
-        t.profile.phases.reduce((sum, phase) => sum + phase.duration, 0)
-    ));
-
-    // Simulate time step by step (1ms increments)
-    while (currentTime <= maxDuration) {
-        // Determine current state for each thread
-        threads.forEach((thread, idx) => {
-            if (thread.finished) return;
-
-            const currentPhase = thread.profile.phases[thread.currentPhaseIndex];
-            const phaseElapsed = currentTime - thread.phaseStartTime;
-
-            // Check if current phase is complete
-            if (phaseElapsed >= currentPhase.duration) {
-                thread.currentPhaseIndex++;
-                thread.phaseStartTime = currentTime;
-
-                // Check if thread finished all phases
-                if (thread.currentPhaseIndex >= thread.profile.phases.length) {
-                    thread.finished = true;
-                    return;
-                }
-            }
-        });
-
+    // Simulation runs until all threads are finished
+    while (threads.some(t => !t.finished)) {
         // Release GVL if holder is now doing IO or finished
         if (gvlHolder !== null) {
             const holder = threads[gvlHolder];
@@ -116,35 +90,56 @@ function simulateThreads(threadConfigs) {
             }
         }
 
-        // Record state for each thread at this time
+        // Record state and advance execution for each thread
         threads.forEach((thread, idx) => {
             if (thread.finished) return;
 
-            const phase = thread.profile.phases[thread.currentPhaseIndex];
+            const currentPhase = thread.profile.phases[thread.currentPhaseIndex];
             let state;
+            let canExecute = false;
 
-            if (phase.type === 'io') {
+            // Determine current state and whether thread can execute
+            if (currentPhase.type === 'io') {
                 state = STATE.IO;
-            } else if (phase.type === 'cpu') {
-                state = (gvlHolder === idx) ? STATE.CPU : STATE.BLOCKED;
+                canExecute = true;  // IO always executes (releases GVL)
+            } else if (currentPhase.type === 'cpu') {
+                if (gvlHolder === idx) {
+                    state = STATE.CPU;
+                    canExecute = true;  // Has GVL, can execute
+                } else {
+                    state = STATE.BLOCKED;
+                    canExecute = false;  // Blocked waiting for GVL
+                }
             }
 
-            // Add or extend timeline segment
+            // Record state in timeline
             const lastSegment = timelines[idx][timelines[idx].length - 1];
             if (lastSegment && lastSegment.state === state) {
-                // Extend existing segment
                 lastSegment.duration++;
             } else {
-                // Start new segment
                 timelines[idx].push({
                     state: state,
-                    startTime: currentTime,
+                    startTime: timelines[idx].reduce((sum, seg) => sum + seg.duration, 0),
                     duration: 1
                 });
             }
-        });
 
-        currentTime++;
+            // Advance execution time only if thread can actually execute
+            if (canExecute) {
+                thread.phaseExecutedTime++;
+
+                // Check if current phase is complete
+                if (thread.phaseExecutedTime >= currentPhase.duration) {
+                    thread.currentPhaseIndex++;
+                    thread.phaseExecutedTime = 0;
+
+                    // Check if thread finished all phases
+                    if (thread.currentPhaseIndex >= thread.profile.phases.length) {
+                        thread.finished = true;
+                    }
+                }
+            }
+        });
     }
 
     return timelines;
@@ -175,6 +170,11 @@ function renderVisualization(timelines) {
         return;
     }
 
+    // Find the maximum timeline duration to make bars proportional
+    const maxTime = Math.max(...timelines.map(timeline =>
+        timeline.reduce((sum, seg) => sum + seg.duration, 0)
+    ));
+
     timelines.forEach((timeline, threadIdx) => {
         // Create thread bar container
         const threadBar = document.createElement('div');
@@ -196,12 +196,15 @@ function renderVisualization(timelines) {
         const timelineEl = document.createElement('div');
         timelineEl.className = 'timeline';
 
+        // Set timeline width proportional to actual duration
+        timelineEl.style.width = `${(totalTime / maxTime) * 100}%`;
+
         // Add segments
         timeline.forEach(segment => {
             const segmentEl = document.createElement('div');
             segmentEl.className = `segment ${segment.state}`;
 
-            // Calculate width as percentage of total time
+            // Calculate width as percentage of THIS thread's total time
             const widthPercent = (segment.duration / totalTime) * 100;
             segmentEl.style.flexBasis = `${widthPercent}%`;
             segmentEl.style.minWidth = '2px'; // Ensure very short segments are visible
