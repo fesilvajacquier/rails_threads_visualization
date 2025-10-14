@@ -155,7 +155,19 @@ function simulateThreads(threadConfigs) {
  * @param {Array<Array<{state: string, startTime: number, duration: number}>>} timelines
  */
 function renderVisualization(timelines) {
+    // Validate timelines parameter is an array
+    if (!Array.isArray(timelines)) {
+        console.error('renderVisualization: timelines parameter must be an array');
+        return;
+    }
+
+    // Verify DOM element exists
     const container = document.getElementById('threads-container');
+    if (!container) {
+        console.error('renderVisualization: threads-container element not found');
+        return;
+    }
+
     container.innerHTML = ''; // Clear previous visualization
 
     if (timelines.length === 0) {
