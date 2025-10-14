@@ -221,3 +221,91 @@ function renderVisualization(timelines) {
         container.appendChild(threadBar);
     });
 }
+
+/**
+ * Generates thread configuration dropdowns based on thread count
+ * @param {number} threadCount
+ */
+function generateThreadConfigs(threadCount) {
+    const container = document.getElementById('thread-configs');
+    container.innerHTML = '';
+
+    for (let i = 0; i < threadCount; i++) {
+        const configDiv = document.createElement('div');
+        configDiv.className = 'thread-config';
+
+        const label = document.createElement('label');
+        label.textContent = `Thread ${i + 1}:`;
+        label.htmlFor = `thread-${i}-type`;
+
+        const select = document.createElement('select');
+        select.id = `thread-${i}-type`;
+        select.innerHTML = `
+            <option value="low-io">Low IO (3 small DB queries)</option>
+            <option value="heavy-io">Heavy IO (LLM API call)</option>
+        `;
+
+        configDiv.appendChild(label);
+        configDiv.appendChild(select);
+        container.appendChild(configDiv);
+    }
+}
+
+/**
+ * Collects current thread configurations from UI
+ * @returns {Array<string>} Array of profile keys
+ */
+function getThreadConfigs() {
+    const threadCountInput = document.getElementById('thread-count');
+    const threadCount = parseInt(threadCountInput.value) || 3;
+
+    const configs = [];
+    for (let i = 0; i < threadCount; i++) {
+        const select = document.getElementById(`thread-${i}-type`);
+        configs.push(select ? select.value : 'low-io');
+    }
+    return configs;
+}
+
+/**
+ * Main function to update visualization
+ */
+function updateVisualization() {
+    const configs = getThreadConfigs();
+    const timelines = simulateThreads(configs);
+    renderVisualization(timelines);
+}
+
+/**
+ * Initialize application on page load
+ */
+document.addEventListener('DOMContentLoaded', () => {
+    const threadCountInput = document.getElementById('thread-count');
+    const regenerateButton = document.getElementById('regenerate');
+
+    // Initialize with default thread count
+    const initialThreadCount = parseInt(threadCountInput.value) || 3;
+    generateThreadConfigs(initialThreadCount);
+    updateVisualization();
+
+    // Update configs when thread count changes
+    threadCountInput.addEventListener('input', (e) => {
+        const count = parseInt(e.target.value);
+        if (count >= 1 && count <= 10) {
+            generateThreadConfigs(count);
+            updateVisualization();
+        }
+    });
+
+    // Regenerate on button click
+    regenerateButton.addEventListener('click', () => {
+        updateVisualization();
+    });
+
+    // Update when any thread config dropdown changes
+    document.getElementById('thread-configs').addEventListener('change', (e) => {
+        if (e.target.tagName === 'SELECT') {
+            updateVisualization();
+        }
+    });
+});
