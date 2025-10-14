@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puma Threads Visualization - GVL Contention</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Puma Threads Visualization</h1>
+        <p>Visualize how Ruby threads compete for the Global VM Lock (GVL)</p>
+    </header>
+
+    <main>
+        <section id="controls">
+            <h2>Configuration</h2>
+            <div class="control-group">
+                <label for="thread-count">Number of Threads:</label>
+                <input type="number" id="thread-count" min="1" max="10" value="3">
+            </div>
+            <div id="thread-configs"></div>
+            <button id="regenerate">Generate Visualization</button>
+        </section>
+
+        <section id="legend">
+            <h3>Legend</h3>
+            <div class="legend-items">
+                <div class="legend-item">
+                    <span class="color-box cpu"></span>
+                    <span>Green: Using CPU (has GVL)</span>
+                </div>
+                <div class="legend-item">
+                    <span class="color-box io"></span>
+                    <span>Yellow: Waiting on IO (released GVL)</span>
+                </div>
+                <div class="legend-item">
+                    <span class="color-box blocked"></span>
+                    <span>Red: Blocked waiting for GVL</span>
+                </div>
+            </div>
+        </section>
+
+        <section id="visualization">
+            <h2>Thread Timeline</h2>
+            <div id="threads-container"></div>
+        </section>
+    </main>
+
+    <script src="simulation.js"></script>
+</body>
+</html>
