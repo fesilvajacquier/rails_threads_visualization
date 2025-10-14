@@ -149,3 +149,63 @@ function simulateThreads(threadConfigs) {
 
     return timelines;
 }
+
+/**
+ * Renders thread timelines as colored bar segments
+ * @param {Array<Array<{state: string, startTime: number, duration: number}>>} timelines
+ */
+function renderVisualization(timelines) {
+    const container = document.getElementById('threads-container');
+    container.innerHTML = ''; // Clear previous visualization
+
+    if (timelines.length === 0) {
+        container.innerHTML = '<p>Adjust settings to see visualization</p>';
+        return;
+    }
+
+    timelines.forEach((timeline, threadIdx) => {
+        // Create thread bar container
+        const threadBar = document.createElement('div');
+        threadBar.className = 'thread-bar';
+
+        // Calculate total time for this thread
+        const totalTime = timeline.reduce((sum, seg) => sum + seg.duration, 0);
+
+        // Create label
+        const label = document.createElement('div');
+        label.className = 'thread-label';
+        label.innerHTML = `
+            <span>Thread ${threadIdx + 1}</span>
+            <span>${totalTime}ms</span>
+        `;
+        threadBar.appendChild(label);
+
+        // Create timeline container
+        const timelineEl = document.createElement('div');
+        timelineEl.className = 'timeline';
+
+        // Add segments
+        timeline.forEach(segment => {
+            const segmentEl = document.createElement('div');
+            segmentEl.className = `segment ${segment.state}`;
+
+            // Calculate width as percentage of total time
+            const widthPercent = (segment.duration / totalTime) * 100;
+            segmentEl.style.flexBasis = `${widthPercent}%`;
+            segmentEl.style.minWidth = '2px'; // Ensure very short segments are visible
+
+            // Add tooltip
+            const stateNames = {
+                'cpu': 'Using CPU',
+                'io': 'Waiting on IO',
+                'blocked': 'Blocked (waiting for GVL)'
+            };
+            segmentEl.title = `${stateNames[segment.state]}: ${segment.startTime}-${segment.startTime + segment.duration}ms`;
+
+            timelineEl.appendChild(segmentEl);
+        });
+
+        threadBar.appendChild(timelineEl);
+        container.appendChild(threadBar);
+    });
+}
