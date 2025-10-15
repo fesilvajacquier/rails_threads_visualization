@@ -32,12 +32,24 @@ main {
     padding: 0 1rem;
 }
 
+/* Sidebar container for controls and metrics */
+.sidebar-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
 section {
     background: white;
     padding: 1.5rem;
     margin-bottom: 2rem;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.sidebar-container section {
+    margin-bottom: 0;
 }
 
 h2 {
@@ -178,6 +190,11 @@ button:hover {
 }
 
 /* Visualization Section */
+#visualization {
+    border: 2px solid #3498db;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
 #threads-container {
     margin-top: 1rem;
 }
@@ -241,6 +258,20 @@ button:hover {
 @media (max-width: 768px) {
     main {
         padding: 0 0.5rem;
+    }
+
+    /* Stack sidebar columns on mobile */
+    .sidebar-container {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .sidebar-container section {
+        margin-bottom: 1rem;
+    }
+
+    .sidebar-container section:last-child {
+        margin-bottom: 0;
     }
 
     .legend-items {
