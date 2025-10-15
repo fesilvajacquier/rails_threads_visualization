@@ -58,6 +58,7 @@ Your site will be available at: `https://<username>.github.io/<repo-name>/`
 - Simulation runs in 1ms time steps
 - GVL is modeled as exclusive lock (only one thread can hold it)
 - IO operations release the GVL, allowing other threads to proceed
+- GVL assignment uses FIFO wait-time-based scheduling (thread that waited longest gets priority)
 
 ## Purpose
 

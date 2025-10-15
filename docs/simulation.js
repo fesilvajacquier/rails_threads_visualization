@@ -55,11 +55,13 @@ function simulateThreads(threadConfigs) {
         profile: REQUEST_PROFILES[profileKey],
         currentPhaseIndex: 0,
         phaseExecutedTime: 0,  // Time actually spent executing current phase
-        finished: false
+        finished: false,
+        waitingSince: null  // Track when thread started waiting for GVL (for FIFO scheduling)
     }));
 
     const timelines = threadConfigs.map(() => []);
     let gvlHolder = null; // Index of thread currently holding GVL, or null
+    let currentTime = 0;  // Track current simulation time for FIFO wait queue
 
     // Simulation runs until all threads are finished
     while (threads.some(t => !t.finished)) {
@@ -76,17 +78,34 @@ function simulateThreads(threadConfigs) {
             }
         }
 
-        // Assign GVL if free and threads need it
+        // Assign GVL if free and threads need it (FIFO based on wait time)
         if (gvlHolder === null) {
+            let oldestWaiter = null;
+            let oldestWaitTime = Infinity;
+
             for (let i = 0; i < threads.length; i++) {
                 const thread = threads[i];
                 if (!thread.finished) {
                     const phase = thread.profile.phases[thread.currentPhaseIndex];
                     if (phase.type === 'cpu') {
-                        gvlHolder = i;
-                        break;
+                        // Record when thread started waiting if not already tracked
+                        if (thread.waitingSince === null) {
+                            thread.waitingSince = currentTime;
+                        }
+
+                        // Find the thread that has been waiting the longest
+                        if (thread.waitingSince < oldestWaitTime) {
+                            oldestWaiter = i;
+                            oldestWaitTime = thread.waitingSince;
+                        }
                     }
                 }
+            }
+
+            // Assign GVL to the thread that waited the longest
+            if (oldestWaiter !== null) {
+                gvlHolder = oldestWaiter;
+                threads[oldestWaiter].waitingSince = null; // Clear wait time when granted GVL
             }
         }
 
@@ -102,6 +121,7 @@ function simulateThreads(threadConfigs) {
             if (currentPhase.type === 'io') {
                 state = STATE.IO;
                 canExecute = true;  // IO always executes (releases GVL)
+                thread.waitingSince = null;  // Clear wait time when doing IO
             } else if (currentPhase.type === 'cpu') {
                 if (gvlHolder === idx) {
                     state = STATE.CPU;
@@ -140,6 +160,8 @@ function simulateThreads(threadConfigs) {
                 }
             }
         });
+
+        currentTime++;  // Increment time at end of each simulation step
     }
 
     return timelines;
