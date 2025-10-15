@@ -8,10 +8,14 @@ An interactive visualization showing how Ruby/Puma threads compete for the Globa
 - Select request types per thread:
   - **Low IO**: 3 small DB queries (30ms IO, 90ms CPU)
   - **Heavy IO**: External API/LLM call (500ms IO, 60ms CPU)
-- Real-time visualization of:
+- Real-time visualization that updates automatically:
   - Green: Thread using CPU (has GVL)
   - Yellow: Thread waiting on IO (released GVL)
   - Red: Thread blocked waiting for GVL
+- Performance metrics:
+  - Per-thread metrics: Total time, blocked time (red emphasis), active time (CPU + IO)
+  - System-wide metrics: Total active time, total blocked time, GVL contention percentage
+  - Highlights time wasted on GVL contention for educational insight
 
 ## Local Development
 

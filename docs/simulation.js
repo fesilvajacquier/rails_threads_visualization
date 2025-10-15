@@ -33,7 +33,7 @@ const STATE = {
 /**
  * Simulates concurrent thread execution with GVL contention
  * @param {Array<string>} threadConfigs - Array of profile keys (e.g., ['low-io', 'heavy-io', 'low-io'])
- * @returns {Array<Array<{state: string, startTime: number, duration: number}>>} Timeline for each thread
+ * @returns {{timelines: Array, metrics: Object}} Timelines and calculated metrics
  */
 function simulateThreads(threadConfigs) {
     // Input validation
@@ -42,7 +42,7 @@ function simulateThreads(threadConfigs) {
     }
 
     if (threadConfigs.length === 0) {
-        return [];
+        return { timelines: [], metrics: { perThread: [], aggregate: { totalBlocked: 0, totalActive: 0, percentBlocked: 0 } } };
     }
 
     // Validate all profile keys exist
@@ -164,14 +164,50 @@ function simulateThreads(threadConfigs) {
         currentTime++;  // Increment time at end of each simulation step
     }
 
-    return timelines;
+    // Calculate metrics from timelines
+    const perThreadMetrics = timelines.map((timeline, idx) => {
+        const blocked = timeline.filter(seg => seg.state === STATE.BLOCKED).reduce((sum, seg) => sum + seg.duration, 0);
+        const cpu = timeline.filter(seg => seg.state === STATE.CPU).reduce((sum, seg) => sum + seg.duration, 0);
+        const io = timeline.filter(seg => seg.state === STATE.IO).reduce((sum, seg) => sum + seg.duration, 0);
+        const total = timeline.reduce((sum, seg) => sum + seg.duration, 0);
+        const active = cpu + io;
+
+        return {
+            threadId: idx,
+            blocked,
+            cpu,
+            io,
+            active,
+            total
+        };
+    });
+
+    // Calculate aggregate metrics
+    const totalBlocked = perThreadMetrics.reduce((sum, m) => sum + m.blocked, 0);
+    const totalActive = perThreadMetrics.reduce((sum, m) => sum + m.active, 0);
+    const totalTime = totalBlocked + totalActive;
+    const percentBlocked = totalTime > 0 ? (totalBlocked / totalTime * 100) : 0;
+
+    return {
+        timelines,
+        metrics: {
+            perThread: perThreadMetrics,
+            aggregate: {
+                totalBlocked,
+                totalActive,
+                totalTime,
+                percentBlocked
+            }
+        }
+    };
 }
 
 /**
  * Renders thread timelines as colored bar segments
  * @param {Array<Array<{state: string, startTime: number, duration: number}>>} timelines
+ * @param {Array<Object>} perThreadMetrics - Metrics for each thread
  */
-function renderVisualization(timelines) {
+function renderVisualization(timelines, perThreadMetrics) {
     // Validate timelines parameter is an array
     if (!Array.isArray(timelines)) {
         console.error('renderVisualization: timelines parameter must be an array');
@@ -205,12 +241,17 @@ function renderVisualization(timelines) {
         // Calculate total time for this thread
         const totalTime = timeline.reduce((sum, seg) => sum + seg.duration, 0);
 
+        // Get metrics for this thread
+        const metrics = perThreadMetrics[threadIdx];
+
         // Create label
         const label = document.createElement('div');
         label.className = 'thread-label';
         label.innerHTML = `
             <span>Thread ${threadIdx + 1}</span>
-            <span>${totalTime}ms</span>
+            <span>Total: ${metrics.total}ms</span>
+            <span class="blocked-metric">Blocked: ${metrics.blocked}ms</span>
+            <span>Active: ${metrics.active}ms</span>
         `;
         threadBar.appendChild(label);
 
@@ -245,6 +286,39 @@ function renderVisualization(timelines) {
         threadBar.appendChild(timelineEl);
         container.appendChild(threadBar);
     });
+}
+
+/**
+ * Renders aggregate metrics summary
+ * @param {Object} aggregateMetrics - Aggregate metrics object
+ */
+function renderMetricsSummary(aggregateMetrics) {
+    const container = document.getElementById('metrics-container');
+    if (!container) {
+        console.error('renderMetricsSummary: metrics-container element not found');
+        return;
+    }
+
+    container.innerHTML = '';
+
+    const summaryDiv = document.createElement('div');
+    summaryDiv.className = 'metrics-summary';
+    summaryDiv.innerHTML = `
+        <div class="metric-item">
+            <span class="metric-label">Total Active Time (CPU + IO):</span>
+            <span class="metric-value">${aggregateMetrics.totalActive}ms</span>
+        </div>
+        <div class="metric-item">
+            <span class="metric-label">Total Blocked Time:</span>
+            <span class="metric-value blocked-metric">${aggregateMetrics.totalBlocked}ms</span>
+        </div>
+        <div class="metric-item">
+            <span class="metric-label">System Time Wasted on GVL Contention:</span>
+            <span class="metric-value blocked-metric">${aggregateMetrics.percentBlocked.toFixed(1)}%</span>
+        </div>
+    `;
+
+    container.appendChild(summaryDiv);
 }
 
 /**
@@ -301,8 +375,9 @@ function getThreadConfigs() {
  */
 function updateVisualization() {
     const configs = getThreadConfigs();
-    const timelines = simulateThreads(configs);
-    renderVisualization(timelines);
+    const { timelines, metrics } = simulateThreads(configs);
+    renderVisualization(timelines, metrics.perThread);
+    renderMetricsSummary(metrics.aggregate);
 }
 
 /**
@@ -310,10 +385,9 @@ function updateVisualization() {
  */
 document.addEventListener('DOMContentLoaded', () => {
     const threadCountInput = document.getElementById('thread-count');
-    const regenerateButton = document.getElementById('regenerate');
 
-    if (!threadCountInput || !regenerateButton) {
-        console.error('DOMContentLoaded: Required elements (thread-count or regenerate) not found');
+    if (!threadCountInput) {
+        console.error('DOMContentLoaded: Required elements (thread-count) not found');
         return;
     }
 
@@ -329,11 +403,6 @@ document.addEventListener('DOMContentLoaded', () => {
             generateThreadConfigs(count);
             updateVisualization();
         }
-    });
-
-    // Regenerate on button click
-    regenerateButton.addEventListener('click', () => {
-        updateVisualization();
     });
 
     // Update when any thread config dropdown changes
